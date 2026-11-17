@@ -22,6 +22,11 @@ lp_support() { # name gen-mode objnoise
   cp $W/$1.sol $W/$1.support
 }
 
+score() { # solution -> "phrases words" of its palindrome, checked by verify.py
+  $N build/mip walk upstream/npdict.txt "$1" "$1.txt" > /dev/null 2>&1
+  python3 -I verify.py "$1.txt" | sed -n 's/^OK palindrome: \([0-9,]*\) phrases, \([0-9,]*\) words.*/\1 \2/p' | tr -d ,
+}
+
 restricted() { # name time_limit warm-name|- support-files...
   local name=$1 tl=$2 warm=$3; shift 3
   python3 -I tools/mksup.py $W/$name.sup "$@" > /dev/null
@@ -32,7 +37,15 @@ restricted() { # name time_limit warm-name|- support-files...
     opt="${opt}read_solution_file = $W/$name.warm\n"
   fi
   highs_run $W/$name "$opt"
-  echo "$name: $(grep -E '^  Primal bound|^  Gap' $W/$name.log | tr -s ' ' | tr '\n' ' ')"
+  local new old; new=$(score $W/$name.sol)
+  # At a time limit HiGHS can return less than its start (the start maps to a worse point in the presolved model): keep the start.
+  if [ "$warm" != - ]; then
+    old=$(score $W/$warm.sol)
+    if [ -z "$new" ] || awk -v a="$new" -v b="$old" 'BEGIN { split(a, x); split(b, y); exit !(x[1] < y[1] || (x[1] == y[1] && x[2] < y[2])) }'; then
+      cp $W/$warm.sol $W/$name.sol; new="$old (kept $warm)"
+    fi
+  fi
+  echo "$name: phrases words = $new; HiGHS $(grep -E '^  Gap' $W/$name.log | tr -s ' ')"
 }
 
 [ "${1:-}" = --lp ] && LP=1
