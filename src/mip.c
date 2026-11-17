@@ -8,7 +8,8 @@
 
 static Graph G;
 static char *used;
-static int ns, start, ends; /* ends: the walk can stop at any terminal state (virtual arc y<t>: t -> start) */
+static double noise; static unsigned long rng; /* OBJNOISE=a,seed: objective 1 + a*u, u in [0,1), for other LP vertices */
+static int ns, start, ends, mincount; /* mincount > 0: keep at least this many edges, maximize words */ /* ends: the walk can stop at any terminal state (virtual arc y<t>: t -> start) */
 static long ne;
 static int *efrom, *eto, *eph, *comp;
 static long *eid; /* variable name x<eid>: index in the full edge list */
@@ -65,9 +66,18 @@ static void write_terms(FILE *f, const char *name, long *list, char *sign, int n
 
 static void gen(const char *path, char *mask) {
     if (mask) { long k = 0; for (long e = 0; e < ne; e++) if (mask[e]) { efrom[k] = efrom[e]; eto[k] = eto[e]; eph[k] = eph[e]; eid[k] = eid[e]; k++; } ne = k; }
+    /* end states: terminal states with an incoming edge */
+    char *isend = calloc(ns, 1); int nend = 0;
+    if (ends) for (long e = 0; e < ne; e++) { int t = eto[e]; if (G.term[t] && t != start && !isend[t]) { isend[t] = 1; nend++; } }
     FILE *f = fopen(path, "w");
     fprintf(f, "Maximize\n obj:");
-    for (long e = 0; e < ne; e++) { fprintf(f, " + x%ld", eid[e]); if (e % 40 == 39) fputc('\n', f); }
+    for (long e = 0; e < ne; e++) {
+        if (mincount) fprintf(f, " + %d x%ld", count_words(G.d.text[eph[e]]), eid[e]);
+        else if (noise) { rng = rng * 6364136223846793005UL + 1442695040888963407UL; fprintf(f, " + %.6f x%ld", 1 + noise * (double)(rng >> 11) / 9007199254740992.0, eid[e]); }
+        else fprintf(f, " + x%ld", eid[e]);
+        if (e % 40 == 39) fputc('\n', f);
+    }
+    for (int t = 0; t < ns; t++) if (isend[t]) fprintf(f, "\n + 0 y%d", t); /* fixes the column order: x..., then y... */
     fprintf(f, "\nSubject To\n");
     /* balance rows: group edges by state */
     int *deg = calloc(ns + 1, sizeof(int));
@@ -81,9 +91,6 @@ static void gen(const char *path, char *mask) {
         lst[fill[eto[e]]] = e; sg[fill[eto[e]]++] = '-';
     }
     char name[64];
-    /* end states: terminal states with an incoming edge */
-    char *isend = calloc(ns, 1); int nend = 0;
-    if (ends) for (long e = 0; e < ne; e++) { int t = eto[e]; if (G.term[t] && t != start && !isend[t]) { isend[t] = 1; nend++; } }
     for (int v = 0; v < ns; v++) if (fill[v] > deg[v]) {
         char rhs[64] = "= 0";
         if (isend[v]) snprintf(rhs, sizeof rhs, "+ y%d = 0", v);
@@ -101,6 +108,11 @@ static void gen(const char *path, char *mask) {
     memcpy(pf, pd, n * sizeof(int));
     for (long e = 0; e < ne; e++) { pl[pf[eph[e]]] = e; ps[pf[eph[e]]++] = '+'; }
     for (int p = 0; p < n; p++) if (pd[p + 1] - pd[p] > 1) { snprintf(name, sizeof name, "p%d", p); write_terms(f, name, pl + pd[p], ps + pd[p], pd[p + 1] - pd[p], "<= 1"); }
+    if (mincount) {
+        fprintf(f, " count:");
+        for (long e = 0; e < ne; e++) { fprintf(f, " + x%ld", eid[e]); if (e % 40 == 39) fputc('\n', f); }
+        fprintf(f, " >= %d\n", mincount);
+    }
     /* the walk must leave the start state */
     int k = 0; for (long e = 0; e < ne; e++) if (efrom[e] == start) { lst[k] = e; sg[k++] = '+'; }
     write_terms(f, "start", lst, sg, k, ">= 1");
@@ -157,6 +169,8 @@ static void walk(const char *solpath, const char *out) {
 
 int main(int argc, char **argv) {
     if (argc > 1 && !strncmp(argv[1], "ends-", 5)) { ends = 1; argv[1] += 5; }
+    if (getenv("MINCOUNT")) mincount = atoi(getenv("MINCOUNT"));
+    if (getenv("OBJNOISE")) { noise = atof(getenv("OBJNOISE")); const char *c = strchr(getenv("OBJNOISE"), ','); rng = c ? strtoul(c + 1, 0, 10) : 1; }
     if (argc < 4) { fprintf(stderr, "usage: mip gen npdict.txt model.lp | mip walk npdict.txt sol out.txt\n"); return 1; }
     G = graph_build(argv[2]);
     ns = G.ns;
