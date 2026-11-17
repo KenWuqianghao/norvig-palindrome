@@ -1,0 +1,4 @@
+decision.tsv
+build/
+runs/
+*.o
