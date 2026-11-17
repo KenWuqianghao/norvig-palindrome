@@ -1,9 +1,11 @@
 # Next ideas (one change per measurement)
 
-1. euler v1: splice shortest cycles at any visited state (running).
-2. If v1 stalls: also let the walk end move (path from the end to another terminal state).
-3. Cycle choice: prefer cycles through rare phrases, or random among shortest.
-4. Large-neighbourhood search: remove random segments X..X, re-insert greedily, keep if not worse.
-5. Segment replacement: replace a sub-walk X..Y with a longer path X..Y.
-6. Upper bound: LP of the phrase-disjoint circulation, to know the room left.
-7. DFS side track: Norvig's own suggestion (subtract used phrases from prefix counts), randomized restarts.
+Gap: 21,592 found, 22,050 bound (458 phrases, 2.1%).
+
+1. Full MIP with warm start (running): better solution, or a smaller gap.
+2. Larger restricted MIP: LP support plus edges with reduced cost 0.
+3. Several LP vertices (perturbed objective, for example weight by words) and the union of their supports.
+4. Tie-break: with the phrase count fixed at the best, maximize words.
+5. Tighter bound: add connectivity cuts if a solution has a component that does not touch the start.
+
+Done or rejected: middle-only DFS (Norvig, 16,111); greedy cycle splice (14,817); splice into the DFS result (+0).
