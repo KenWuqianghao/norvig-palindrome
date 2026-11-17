@@ -1,0 +1,7 @@
+threads = 1
+time_limit = 1800
+mip_rel_gap = 0
+read_solution_file = warm_w2.sol
+write_solution_to_file = true
+solution_file = w2.sol
+write_solution_style = 0

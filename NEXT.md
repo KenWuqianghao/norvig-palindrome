@@ -1,11 +1,9 @@
-# Next ideas (one change per measurement)
+# Next ideas
 
-Gap: 21,592 found, 22,050 bound (458 phrases, 2.1%).
+Gap: 21,729 found, 22,050 bound (321 phrases, 1.5 %). The kernel loop gave +89, +39, +7, +2 per 40-minute step, so it is at a plateau.
 
-1. Full MIP with warm start (running): better solution, or a smaller gap.
-2. Larger restricted MIP: LP support plus edges with reduced cost 0.
-3. Several LP vertices (perturbed objective, for example weight by words) and the union of their supports.
-4. Tie-break: with the phrase count fixed at the best, maximize words.
-5. Tighter bound: add connectivity cuts if a solution has a component that does not touch the start.
+1. Tighter bound: the full MIP root with cuts reached 21,892.2 (HiGHS log, units not confirmed). Run the full MIP to the end of its root with more memory/CPU to state a confirmed bound.
+2. More cores: the full MIP with 8 threads, or on the Steam Deck (not allowed in this run).
+3. A connectivity cut is not needed so far: every solution was connected to the start.
 
-Done or rejected: middle-only DFS (Norvig, 16,111); greedy cycle splice (14,817); splice into the DFS result (+0).
+Done or rejected: middle-only DFS (Norvig, 16,111); greedy cycle splice (14,817); splice into the DFS result (+0); full MIP from scratch (root LP did not end in 30 min with dual simplex).
