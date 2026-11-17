@@ -1,0 +1,9 @@
+threads = 1
+time_limit = 2400
+mip_rel_gap = 0
+read_solution_file = warm_r2.sol
+write_solution_to_file = true
+solution_file = r2.sol
+write_solution_style = 0
+mip_improving_solution_save = true
+mip_improving_solution_file = r2.improving.sol
