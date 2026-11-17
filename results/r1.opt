@@ -1,0 +1,6 @@
+threads = 1
+time_limit = 1800
+mip_rel_gap = 0
+write_solution_to_file = true
+solution_file = r1.sol
+write_solution_style = 0

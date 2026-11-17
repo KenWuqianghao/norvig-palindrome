@@ -1,13 +1,14 @@
 /* Integer program: choose at most one edge per phrase so that every state is balanced (a circulation
  * through the start state). Modes:
  *   mip gen  npdict.txt model.lp            write the model for the start state's strongly connected component
+ * Prefix the mode with "ends-" to let the walk stop at any terminal state.
  *   mip walk npdict.txt solution.sol out.txt read a HiGHS solution, keep the part connected to the start,
  *                                            write the palindrome (Euler circuit from the start state) */
 #include "graph.h"
 
 static Graph G;
 static char *used;
-static int ns, start;
+static int ns, start, ends; /* ends: the walk can stop at any terminal state (virtual arc y<t>: t -> start) */
 static long ne;
 static int *efrom, *eto, *eph, *comp;
 static long *eid; /* variable name x<eid>: index in the full edge list */
@@ -30,6 +31,7 @@ static void build_component(void) {
     int *fill = xmalloc(ns * sizeof(int)); memcpy(fill, roff, ns * sizeof(int));
     for (int v = 0; v < ns; v++) for (long k = off[v]; k < off[v + 1]; k++) rfrom[fill[to[k]]++] = v;
     qh = qt = 0; bw[start] = 1; q[qt++] = start;
+    if (ends) for (int v = 0; v < ns; v++) if (fw[v] && G.term[v] && v != start) { bw[v] = 1; q[qt++] = v; }
     while (qh < qt) { int v = q[qh++]; for (int k = roff[v]; k < roff[v + 1]; k++) if (!bw[rfrom[k]]) { bw[rfrom[k]] = 1; q[qt++] = rfrom[k]; } }
     comp = xmalloc(ns * sizeof(int));
     for (int v = 0; v < ns; v++) comp[v] = fw[v] && bw[v];
@@ -79,7 +81,17 @@ static void gen(const char *path, char *mask) {
         lst[fill[eto[e]]] = e; sg[fill[eto[e]]++] = '-';
     }
     char name[64];
-    for (int v = 0; v < ns; v++) if (fill[v] > deg[v]) { snprintf(name, sizeof name, "b%d", v); write_terms(f, name, lst + deg[v], sg + deg[v], fill[v] - deg[v], "= 0"); }
+    /* end states: terminal states with an incoming edge */
+    char *isend = calloc(ns, 1); int nend = 0;
+    if (ends) for (long e = 0; e < ne; e++) { int t = eto[e]; if (G.term[t] && t != start && !isend[t]) { isend[t] = 1; nend++; } }
+    for (int v = 0; v < ns; v++) if (fill[v] > deg[v]) {
+        char rhs[64] = "= 0";
+        if (isend[v]) snprintf(rhs, sizeof rhs, "+ y%d = 0", v);
+        snprintf(name, sizeof name, "b%d", v);
+        write_terms(f, name, lst + deg[v], sg + deg[v], fill[v] - deg[v], v == start && nend ? "" : rhs);
+        if (v == start && nend) { int c = 0; for (int t = 0; t < ns; t++) if (isend[t]) { fprintf(f, " - y%d", t); if (++c % 40 == 0) fputc('\n', f); } fprintf(f, " = 0\n"); }
+    }
+    if (nend) { fprintf(f, " end:"); int c = 0; for (int t = 0; t < ns; t++) if (isend[t]) { fprintf(f, " + y%d", t); if (++c % 40 == 0) fputc('\n', f); } fprintf(f, " <= 1\n"); }
     /* phrase rows */
     int n = G.d.n;
     int *pd = calloc(n + 1, sizeof(int));
@@ -94,13 +106,15 @@ static void gen(const char *path, char *mask) {
     write_terms(f, "start", lst, sg, k, ">= 1");
     fprintf(f, "Bounds\n");
     for (long e = 0; e < ne; e++) fprintf(f, " 0 <= x%ld <= 1\n", eid[e]);
+    for (int t = 0; t < ns; t++) if (isend[t]) fprintf(f, " 0 <= y%d <= 1\n", t);
     fprintf(f, "Binaries\n");
     for (long e = 0; e < ne; e++) { fprintf(f, " x%ld", eid[e]); if (e % 40 == 39) fputc('\n', f); }
+    for (int t = 0; t < ns; t++) if (isend[t]) fprintf(f, "\n y%d", t);
     fprintf(f, "\nEnd\n");
     fclose(f);
     int np = 0; for (int p = 0; p < n; p++) np += pd[p + 1] > pd[p];
     int nsc = 0; for (int v = 0; v < ns; v++) nsc += comp[v];
-    fprintf(stderr, "component: %d states, %ld edges, %d phrases\n", nsc, ne, np);
+    fprintf(stderr, "component: %d states, %ld edges, %d phrases, %d end states\n", nsc, ne, np, nend);
 }
 
 static void walk(const char *solpath, const char *out) {
@@ -114,7 +128,7 @@ static void walk(const char *solpath, const char *out) {
     /* checks: balance and one use per phrase */
     int *bal = calloc(ns, sizeof(int)); char *pu = calloc(G.d.n, 1); int bad = 0;
     for (long e = 0; e < ne; e++) if (x[e]) { bal[efrom[e]]++; bal[eto[e]]--; if (pu[eph[e]]++) bad++; }
-    for (int v = 0; v < ns; v++) if (bal[v]) bad++;
+    for (int v = 0; v < ns; v++) if (bal[v] && !(v == start && bal[v] == 1) && !(bal[v] == -1 && G.term[v])) bad++;
     fprintf(stderr, "solution: %ld edges, %d violations\n", m, bad);
     /* Hierholzer from start */
     int *ptr = xmalloc(ns * sizeof(int)); memcpy(ptr, od, ns * sizeof(int));
@@ -142,6 +156,7 @@ static void walk(const char *solpath, const char *out) {
 }
 
 int main(int argc, char **argv) {
+    if (argc > 1 && !strncmp(argv[1], "ends-", 5)) { ends = 1; argv[1] += 5; }
     if (argc < 4) { fprintf(stderr, "usage: mip gen npdict.txt model.lp | mip walk npdict.txt sol out.txt\n"); return 1; }
     G = graph_build(argv[2]);
     ns = G.ns;

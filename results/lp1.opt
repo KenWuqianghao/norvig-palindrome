@@ -1,0 +1,7 @@
+threads = 1
+time_limit = 2400
+solver = ipm
+solve_relaxation = true
+write_solution_to_file = true
+solution_file = lp1.sol
+write_solution_style = 0
