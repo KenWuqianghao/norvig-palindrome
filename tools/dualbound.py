@@ -1,4 +1,4 @@
-# Copied from the 2026-11-17 audit (/Users/kenwu/research/audits/norvig-palindrome.md, Check 4), file
+# Copied from the 2026-11-17 audit (Check 4), file
 # audits/norvig-scratch/dualbound.py. Unchanged below this header.
 # usage: python3 -I tools/dualbound.py model.lp duals.sol
 """Weak-duality certificate: for row multipliers y with valid signs, max c.x s.t. Ax ? b, 0<=x<=u is at most

@@ -43,3 +43,7 @@ The palindrome is built from both ends. The state is the unmatched text in the m
 | `src/euler.c`, `src/scc.c` | rejected greedy method, component check |
 | `results/solutions/` | final edge set, intermediate edge sets, LP supports, ceiling duals |
 | `tools/` | `pipeline.sh`, `dualbound.py` (from the 2026-11-17 audit), support and warm-start helpers |
+
+## Licence
+
+MIT (`LICENSE`). The files in `upstream/` are Peter Norvig's, under his MIT licence (`upstream/LICENSE`).
